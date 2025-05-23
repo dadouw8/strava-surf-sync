@@ -1,0 +1,4 @@
+requests
+garminconnect
+fitparse
+python-dotenv
