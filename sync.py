@@ -1,6 +1,5 @@
 import os
 import requests
-from garminconnect import Garmin
 from dotenv import load_dotenv
 from dateutil import parser, tz
 from fitparse import FitFile
@@ -10,13 +9,9 @@ import fitdecode
 
 load_dotenv()
 
-GARMIN_USERNAME = os.getenv("GARMIN_USERNAME")
-GARMIN_PASSWORD = os.getenv("GARMIN_PASSWORD")
-
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN")
-STRAVA_ACCESS_TOKEN = os.getenv("STRAVA_ACCESS_TOKEN") 
+STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN") 
 
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 
@@ -44,11 +39,6 @@ def get_strava_activities(access_token, per_page=30):
     response.raise_for_status()
     return response.json()
 
-def authenticate_garmin():
-    client = Garmin(GARMIN_USERNAME, GARMIN_PASSWORD)
-    client.login()
-    return client
-
 def update_strava_activity(access_token, activity_id, data):
     url = f"{STRAVA_API_BASE}/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -56,31 +46,8 @@ def update_strava_activity(access_token, activity_id, data):
     response.raise_for_status()
     return response.json()
 
-from datetime import timezone
-
-def find_matching_garmin_activity(strava_activity, garmin_activities, time_tolerance=120, distance_tolerance=100):
-    strava_time = parser.parse(strava_activity["start_date_local"]).replace(tzinfo=cet)
-    strava_distance = strava_activity.get("distance", 0)
-
-
-    for garmin_activity in garmin_activities:
-        garmin_time = parser.parse(garmin_activity["startTimeLocal"]).replace(tzinfo=cet)
-        garmin_distance = garmin_activity.get("distance", 0)
-
-        time_diff = abs((strava_time - garmin_time).total_seconds())
-        distance_diff = abs(strava_distance - garmin_distance)
-
-        if time_diff <= time_tolerance and distance_diff <= distance_tolerance:
-            return garmin_activity
-    
-    return None
-
-
 def main():
-    garmin_client = authenticate_garmin()
     strava_token, new_refresh_token, expires_at = refresh_strava_access_token()
-
-    garmin_activities = garmin_client.get_activities(0, 20)
     strava_activities = get_strava_activities(strava_token)
 
     for strava_activity in strava_activities:
@@ -90,33 +57,6 @@ def main():
             new_type = "Surfing"
             print(f"Updating activity {strava_activity['id']} to: {new_name}")
             update_strava_activity(strava_token, strava_activity["id"], {"name": new_name, "type": new_type})
-            
-            # print(f"Updating sport type {strava_activity["type"]} to: {new_type}")
-            # update_strava_activity(strava_token, strava_activity["id"], {"type": new_type})
-
-            # matching_garmin_activity = find_matching_garmin_activity(strava_activity, garmin_activities)
-            # if matching_garmin_activity:
-            #     print(f"Matched Garmin activity ID: {matching_garmin_activity['activityId']}")
-            #     activity_id = matching_garmin_activity["activityId"]
-                # fit_data = garmin_client.download_activity(activity_id, dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL)
-                # with open(f"{activity_id}.fit", "wb") as f:
-                #     f.write(fit_data)
-                
-                # fitfile = FitFile(f"{activity_id}.fit")
-
-                # for record in fitfile.get_messages("record"):
-                #     for field in record:
-                #         print(f"{field.name}: {field.value}")
-
-                # with fitdecode.FitReader(f'{activity_id}.fit') as fit:
-                #     for frame in fit:
-                #         if frame.frame_type == fitdecode.FIT_FRAME_DATA:
-                #             print(frame.name)
-                #             for field in frame.fields:
-                #                 print(f" * {field.name}: {field.value}")
-            # else:
-            #     print("No matching Garmin activity found...")
-        
 
 
 if __name__ == "__main__":
