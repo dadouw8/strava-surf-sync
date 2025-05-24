@@ -20,58 +20,7 @@ STRAVA_ACCESS_TOKEN = os.getenv("STRAVA_ACCESS_TOKEN")
 
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 
-def authorize_strava_with_write_scope():
-    import webbrowser
-    from urllib.parse import urlparse, parse_qs
-
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    redirect_uri = "http://localhost"
-    scope = "activity:write"
-
-    auth_url = (
-        f"https://www.strava.com/oauth/authorize?"
-        f"client_id={client_id}&response_type=code"
-        f"&redirect_uri={redirect_uri}"
-        f"&approval_prompt=force"
-        f"&scope={scope}"
-    )
-
-    print("Opening browser for Strava OAuth...")
-    webbrowser.open(auth_url)
-    redirected_url = input("Paste the full redirected URL here:\n")
-    
-    # Extract code from redirected URL
-    code = parse_qs(urlparse(redirected_url).query).get("code", [None])[0]
-    if not code:
-        raise Exception("Authorization code not found.")
-    return code
-
-def exchange_strava_code_for_tokens(code):
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    client_secret = os.getenv("STRAVA_CLIENT_SECRET")
-
-    response = requests.post("https://www.strava.com/oauth/token", data={
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "code": code,
-        "grant_type": "authorization_code"
-    })
-    response.raise_for_status()
-    tokens = response.json()
-
-    # Optional: Save to .env
-    with open(".env", "a") as f:
-        f.write(f"\nSTRAVA_ACCESS_TOKEN={tokens['access_token']}")
-        f.write(f"\nSTRAVA_REFRESH_TOKEN={tokens['refresh_token']}")
-        f.write(f"\nSTRAVA_EXPIRES_AT={tokens['expires_at']}")
-    
-    return tokens
-
 def refresh_strava_access_token():
-    STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
-    STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-    STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN")
-
     url = "https://www.strava.com/oauth/token"
     payload = {
         "client_id": STRAVA_CLIENT_ID,
@@ -84,17 +33,6 @@ def refresh_strava_access_token():
     response.raise_for_status()
     tokens = response.json()
 
-    if tokens["refresh_token"] != STRAVA_REFRESH_TOKEN:
-        with open(".env", "r") as f:
-            lines = f.readlines()
-
-        with open(".env", "w") as f:
-            for line in lines:
-                if line.startswith("STRAVA_REFRESH_TOKEN="):
-                    f.write(f"STRAVA_REFRESH_TOKEN={tokens['refresh_token']}\n")
-                else:
-                    f.write(line)
-
     return tokens["access_token"], tokens["refresh_token"], tokens["expires_at"]
 
 
@@ -103,13 +41,6 @@ def get_strava_activities(access_token, per_page=30):
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {"per_page": per_page}
     response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
-    return response.json()
-
-def update_strava_activity(access_token, activity_id, data):
-    url = f"{STRAVA_API_BASE}/activities/{activity_id}"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    response = requests.put(url, headers=headers, data=data)
     response.raise_for_status()
     return response.json()
 
@@ -189,6 +120,4 @@ def main():
 
 
 if __name__ == "__main__":
-    code = authorize_strava_with_write_scope()
-    tokens = exchange_strava_code_for_tokens(code)
     main()
