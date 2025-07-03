@@ -28,6 +28,7 @@ def get_surfing_activities_garmin():
     try:
         client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
         client.login()
+        print("Successfully logged in to Garmin Connect")
 
         activities = client.get_activities(0, 5)
 
@@ -68,7 +69,10 @@ def get_fields(fit_files):
         fields = {}
         for message in fit_file.get_messages():
             if(message.get_value("local_timestamp") is not None):
-                fields["time_created"] = message.get_value("local_timestamp").astimezone(cet)
+                local_time = message.get_value("local_timestamp")
+                local_time = local_time.replace(tzinfo=cet)
+                utc_time = local_time.astimezone(tz.UTC)
+                fields["time_created"] = utc_time           
                 break
         for message in fit_file.get_messages():
             if (message.get_value("wavenum") is not None):
@@ -123,16 +127,14 @@ def main():
     garmin_activities = get_surfing_activities_garmin()
     
 
-
     for strava_activity in strava_activities:
         if "suppen" in strava_activity["name"] and strava_activity["type"] == "StandUpPaddling":
-            
-            
             for garmin_activity in garmin_activities:
                 tolerance = timedelta(seconds=20)
                 strava_date = parser.isoparse(strava_activity["start_date"])
-                strava_time = strava_date.astimezone(cet)
-                if abs(garmin_activity["time_created"] - strava_time) <= tolerance:
+                strava_time = strava_date.astimezone(tz.UTC)
+                garmin_time = garmin_activity["time_created"].astimezone(tz.UTC)
+                if abs(garmin_time - strava_time) <= tolerance:
                     print(f"Found matching Garmin activity for Strava activity {strava_activity['id']}: {garmin_activity}")
                     description = (
                         f"Number Of Total Waves: {garmin_activity['wavenum']}\n"
@@ -144,11 +146,15 @@ def main():
                         f"Max Wave Distance: {garmin_activity['max_wave_distance']} meters\n"
                         f"Max Speed: {garmin_activity['max_wave_speed']} km/h"
                     )
-            
-            new_name = strava_activity["name"].replace("suppen", "Surfen")
-            new_type = "Surfing"
-            print(f"Updating activity {strava_activity['id']} to: {new_name}")
-            update_strava_activity(strava_token, strava_activity["id"], {"name": new_name, "type": new_type, "description": description})
+                    new_name = strava_activity["name"].replace("suppen", "Surfen")
+                    new_type = "Surfing"
+                    print(f"Updating activity {strava_activity['id']} to: {new_name}")
+                    update_strava_activity(strava_token, strava_activity["id"], {
+                        "name": new_name,
+                        "type": new_type,
+                        "description": description
+                    })
+                    break
 
 
 if __name__ == "__main__":
