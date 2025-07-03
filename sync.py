@@ -140,7 +140,7 @@ def main():
                         f"Number Of Total Waves: {garmin_activity['wavenum']}\n"
                         f"Number Of Lefts: {garmin_activity['numlefts']}\n"
                         f"Number Of Rights: {garmin_activity['numrights']}\n"
-                        f"Total Wave Time: {garmin_activity['total_wave_time']} seconds\n"
+                        f"Total Wave Time: {garmin_activity['total_wave_time']} minutes.sec\n"
                         f"Total Wave Distance: {garmin_activity['total_wave_distance']} meters\n"
                         f"Max Wave Time: {garmin_activity['max_wave_time']} seconds\n"
                         f"Max Wave Distance: {garmin_activity['max_wave_distance']} meters\n"
