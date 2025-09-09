@@ -1,3 +1,4 @@
+import time
 import os
 import zipfile
 import requests
@@ -24,19 +25,19 @@ STRAVA_API_BASE = "https://www.strava.com/api/v3"
 GARMIN_EMAIL = os.getenv("GARMIN_EMAIL")
 GARMIN_PASSWORD = os.getenv("GARMIN_PASSWORD")
 
-def get_surfing_activities_garmin():
-    try:
-        client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
-        client.login()
-        print("Successfully logged in to Garmin Connect")
+def get_garmin_api():
+    api = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
+    api.login()
+    print(f"Succesfully logged into Garmin Connect, date:{datetime.today()}")
 
-        activities = client.get_activities(0, 5)
+    return api
 
-        surfing_activities = [a for a in activities if a["activityType"]["typeKey"].lower() == "stand_up_paddleboarding_v2"]
+def get_surfing_activities_garmin(api):
+    activities = api.get_activities(0, 5)
 
-        return fitfiles(client, surfing_activities)
-    except (GarminConnectConnectionError, GarminConnectTooManyRequestsError, GarminConnectAuthenticationError) as e:
-        print(f"Error connecting to Garmin Connect: {e}")
+    surfing_activities = [a for a in activities if a["activityType"]["typeKey"].lower() == "stand_up_paddleboarding_v2"]
+
+    return fitfiles(api, surfing_activities)
 
 def fitfiles(client, activities):
     fit_files = []
@@ -122,39 +123,56 @@ def update_strava_activity(access_token, activity_id, data):
     return response.json()
 
 def main():
-    strava_token, new_refresh_token, expires_at = refresh_strava_access_token()
-    strava_activities = get_strava_activities(strava_token)
-    garmin_activities = get_surfing_activities_garmin()
-    
+    garmin_api = get_garmin_api()
+    exception_thrown = False
 
-    for strava_activity in strava_activities:
-        if "suppen" in strava_activity["name"] and strava_activity["type"] == "StandUpPaddling":
-            for garmin_activity in garmin_activities:
-                tolerance = timedelta(seconds=20)
-                strava_date = parser.isoparse(strava_activity["start_date"])
-                strava_time = strava_date.astimezone(tz.UTC)
-                garmin_time = garmin_activity["time_created"].astimezone(tz.UTC)
-                if abs(garmin_time - strava_time) <= tolerance:
-                    print(f"Found matching Garmin activity for Strava activity {strava_activity['id']}: {garmin_activity}")
-                    description = (
-                        f"Number Of Total Waves: {garmin_activity['wavenum']}\n"
-                        f"Number Of Lefts: {garmin_activity['numlefts']}\n"
-                        f"Number Of Rights: {garmin_activity['numrights']}\n"
-                        f"Total Wave Time: {garmin_activity['total_wave_time']} minutes.sec\n"
-                        f"Total Wave Distance: {garmin_activity['total_wave_distance']} meters\n"
-                        f"Max Wave Time: {garmin_activity['max_wave_time']} seconds\n"
-                        f"Max Wave Distance: {garmin_activity['max_wave_distance']} meters\n"
-                        f"Max Speed: {garmin_activity['max_wave_speed']} km/h"
-                    )
-                    new_name = strava_activity["name"].replace("suppen", "Surfen")
-                    new_type = "Surfing"
-                    print(f"Updating activity {strava_activity['id']} to: {new_name}")
-                    update_strava_activity(strava_token, strava_activity["id"], {
-                        "name": new_name,
-                        "type": new_type,
-                        "description": description
-                    })
-                    break
+    while True:
+        try:
+            strava_token, new_refresh_token, expires_at = refresh_strava_access_token()
+            strava_activities = get_strava_activities(strava_token)
+            garmin_activities = get_surfing_activities_garmin(garmin_api)
+
+            exception_thrown = False
+
+            for strava_activity in strava_activities:
+                if "suppen" in strava_activity["name"] and strava_activity["type"] == "StandUpPaddling":
+                    for garmin_activity in garmin_activities:
+                        tolerance = timedelta(seconds=20)
+                        strava_date = parser.isoparse(strava_activity["start_date"])
+                        strava_time = strava_date.astimezone(tz.UTC)
+                        garmin_time = garmin_activity["time_created"].astimezone(tz.UTC)
+                        if abs(garmin_time - strava_time) <= tolerance:
+                            print(f"Found matching Garmin activity for Strava activity {strava_activity['id']}: {garmin_activity}")
+                            description = (
+                                f"Number Of Total Waves: {garmin_activity['wavenum']}\n"
+                                f"Number Of Lefts: {garmin_activity['numlefts']}\n"
+                                f"Number Of Rights: {garmin_activity['numrights']}\n"
+                                f"Total Wave Time: {garmin_activity['total_wave_time']} minutes.sec\n"
+                                f"Total Wave Distance: {garmin_activity['total_wave_distance']} meters\n"
+                                f"Max Wave Time: {garmin_activity['max_wave_time']} seconds\n"
+                                f"Max Wave Distance: {garmin_activity['max_wave_distance']} meters\n"
+                                f"Max Speed: {garmin_activity['max_wave_speed']} km/h"
+                            )
+                            new_name = strava_activity["name"].replace("suppen", "Surfen")
+                            new_type = "Surfing"
+                            print(f"Updating activity {strava_activity['id']} to: {new_name}")
+                            update_strava_activity(strava_token, strava_activity["id"], {
+                                "name": new_name,
+                                "type": new_type,
+                                "description": description
+                            })
+                            break
+
+                        time.sleep(1800)
+        except Exception as e:
+            if (exception_thrown == True):
+                return
+            else:
+                exception_thrown = True
+            print(f"Exception caught: {e}, re-logging into Garmin...")
+            garmin_api = get_garmin_api()
+            time.sleep(10)
+            
 
 
 if __name__ == "__main__":
