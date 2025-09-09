@@ -163,7 +163,7 @@ def main():
                             })
                             break
 
-                        time.sleep(1800)
+                        time.sleep(300)
         except Exception as e:
             if (exception_thrown == True):
                 return
