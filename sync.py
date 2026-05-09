@@ -27,7 +27,13 @@ GARMIN_PASSWORD = os.getenv("GARMIN_PASSWORD")
 
 def get_garmin_api():
     tokenstore = os.path.expanduser("~/.garmin_tokens")
- 
+
+    try:
+        requests.get("https://www.google.com", timeout=5)
+    except requests.exceptions.ConnectionError:
+        print("No network available, skipping this run.")
+        exit(0)
+
     try:
         api = Garmin()
         api.login(tokenstore)
@@ -38,7 +44,7 @@ def get_garmin_api():
         api.login()
         api.garth.dump(tokenstore)
         print(f"Logged into Garmin with credentials, tokens saved, date:{datetime.today()}")
- 
+
     return api
 
 
